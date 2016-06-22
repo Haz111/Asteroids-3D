@@ -1,6 +1,7 @@
 var container;
 var renderer, composer;
 var scene, camera, controls;
+var render_stats, htmlScore;
 
 // game specyfic
 var ship;
@@ -54,6 +55,16 @@ initScene = function() {
 	render_stats.domElement.style.zIndex = 100;
 	container.appendChild( renderer.domElement );
 
+	htmlScore = document.createElement('points');
+	htmlScore.style.position = 'absolute';
+	htmlScore.style.color = "#624CAB";
+	htmlScore.style.fontSize = "30px";
+	htmlScore.style.fontFamily = '"Lucida Console", Monaco, monospace';
+	htmlScore.innerHTML = "SCORE: 0";
+	htmlScore.style.top = 20 + 'px';
+	htmlScore.style.left = 20 + 'px';
+	container.appendChild(htmlScore);
+
 	scene = new THREE.Scene();
 
 	camera = new THREE.PerspectiveCamera(
@@ -73,7 +84,7 @@ initScene = function() {
 
 	var wallGeometry = new THREE.PlaneGeometry(wallLength, wallLength);
 	for (var i = 0; i < wallProperties.length; i++){
-			var wallMaterial = new THREE.MeshLambertMaterial({color: wallProperties[i].color, transparent: true, opacity: 0.1, side: THREE.DoubleSide});
+			var wallMaterial = new THREE.MeshLambertMaterial({color: wallProperties[i].color, transparent: true, opacity: 0.05, side: THREE.DoubleSide});
 			var wall = new THREE.Mesh(wallGeometry, wallMaterial);
 			wall.position.set(wallProperties[i].x, wallProperties[i].y, wallProperties[i].z);
 			wall.rotation.set(wallProperties[i].rX, wallProperties[i].rY, wallProperties[i].rZ);
@@ -120,10 +131,24 @@ initScene = function() {
 
 		loaded = true;
 
+		initPostprocessing();
 	});
 
-		// initPostprocessing();
-	// camera.position.set(15,15,15);
+	// Skybox
+	var imagePrefix = "textures/skybox/cosmos_";
+	var directions  = ["right1", "left2", "top3", "bottom4", "front5", "back6"];
+	var imageSuffix = ".png";
+	var skyGeometry = new THREE.CubeGeometry( 1000, 1000, 1000 );
+
+	var materialArray = [];
+	for (var i = 0; i < 6; i++)
+		materialArray.push( new THREE.MeshBasicMaterial({
+			map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix ),
+			side: THREE.BackSide
+		}));
+	var skyMaterial = new THREE.MeshFaceMaterial( materialArray );
+	var skyBox = new THREE.Mesh( skyGeometry, skyMaterial );
+	scene.add( skyBox );
 
 	requestAnimationFrame( render );
 };
@@ -196,6 +221,8 @@ update = function(delta) {
 		if(asteroids.length <= 0) spawnNewAsteroids();
 
 		if(controls) controls.update( delta );
+
+		composer.render( delta );
 	}
 };
 
@@ -204,8 +231,8 @@ render = function() {
 
 	requestAnimationFrame( render );
 	update(delta);
-	// composer.render( delta );
-	renderer.render( scene, camera );
+
+	// renderer.render( scene, camera );
 	render_stats.update();
 };
 
@@ -297,20 +324,24 @@ addScore = function(size) {
 		case 2: score += 50; break;
 		case 3: score += 100; break;
 	}
+	htmlScore.innerHTML = "SCORE: " + score;
 }
 
 initPostprocessing = function() {
+
+	var renderPass = new THREE.RenderPass( scene, camera );
+
+	var shaderPass = new THREE.ShaderPass( THREE.RGBShiftShader );
+	shaderPass.uniforms[ 'amount' ].value = 0.0015;
+	shaderPass.renderToScreen = true;
+
+	var effectFilm = new THREE.FilmPass(0.35, 0.25, 648, true);
+
 	composer = new THREE.EffectComposer( renderer );
-	composer.addPass( new THREE.RenderPass( scene, camera ) );
+	composer.addPass( renderPass );
+	composer.addPass( shaderPass );
+	// composer.addPass( effectFilm );
 
-	var effect = new THREE.ShaderPass( THREE.DotScreenShader );
-	effect.uniforms[ 'scale' ].value = 4;
-	composer.addPass( effect );
-
-	var effect = new THREE.ShaderPass( THREE.RGBShiftShader );
-	effect.uniforms[ 'amount' ].value = 0.0015;
-	effect.renderToScreen = true;
-	composer.addPass( effect );
 }
 
 additionalControls = function(event) {
