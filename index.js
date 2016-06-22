@@ -5,12 +5,18 @@ var scene, camera, controls;
 // game specyfic
 var ship;
 var bullets = [];
+var asteroidsAmount = 10;
+var asteroids = [];
+var asteroidMaterial, asteroidEdgesMaterial;
+
+var loaded = false;
+
+var score = 0;
 
 // other
 var clock = new THREE.Clock();
 
 // constants
-
 var wallLength = 400;
 var halfWall = wallLength / 2;
 
@@ -24,7 +30,15 @@ var wallProperties = [
 	]
 
 	var bulletDiscanceMax = halfWall;
-	var bulletSpeed = 80;
+	var bulletSpeed = 400;
+
+	var asteroidStartSpeedMax = 25;
+	var asteroidStartSpeedMin = 40;
+	var asteroidMaxSpeed = 100;
+	var asteroidAcceleration = 2;
+	var asteroidShipBuffor = 20; // buffor to ship when new asteroid appears
+	var asteroidWallBuffor = 4;
+	var asteroidChildAmount = 3;
 
 initScene = function() {
 	container = document.getElementById('threejs-renderer');
@@ -58,16 +72,11 @@ initScene = function() {
 	// bounds
 
 	var wallGeometry = new THREE.PlaneGeometry(wallLength, wallLength);
-	// var wallMaterial = new THREE.MeshLambertMaterial({color: 0x0000ff, transparent: true, opacity: 0.1});
 	for (var i = 0; i < wallProperties.length; i++){
-			var wallMaterial = new THREE.MeshLambertMaterial({color: wallProperties[i].color, transparent: true, opacity: 0.1});
-			// console.log(wallMaterial.color);
-			// wallMaterial.color = wallProperties[i].color;
-			// console.log(wallMaterial.color);
+			var wallMaterial = new THREE.MeshLambertMaterial({color: wallProperties[i].color, transparent: true, opacity: 0.1, side: THREE.DoubleSide});
 			var wall = new THREE.Mesh(wallGeometry, wallMaterial);
 			wall.position.set(wallProperties[i].x, wallProperties[i].y, wallProperties[i].z);
 			wall.rotation.set(wallProperties[i].rX, wallProperties[i].rY, wallProperties[i].rZ);
-			// wall.rotation.y = wallProperties[i].rotationY;
 			scene.add(wall);
 	}
 
@@ -81,6 +90,7 @@ initScene = function() {
 		}
 		var shipMaterial = new THREE.MultiMaterial( shipMaterials );
 		ship = new THREE.Mesh( shipGeometry, shipMaterial );
+		ship.radius = 2;
 		// edges
 		var edgesGeometry = new THREE.EdgesGeometry( shipGeometry );
 		var edgesMaterial = new THREE.LineBasicMaterial( { color: 0xFFFFFF, linewidth: 3 } );
@@ -97,12 +107,20 @@ initScene = function() {
 		// controls
 		controls = new THREE.FlyControls( ship );
 		controls.movementSpeed = 60;
+		// controls.rollSpeed = 100;
 		controls.domElement = container;
 		controls.rollSpeed = Math.PI / 24;
 		controls.autoForward = false;
 		controls.dragToLook = false;
-	});
 
+		asteroidMaterial = new THREE.MeshBasicMaterial( {color: 0xffffaa, transparent: true, opacity: 0.3} );
+		asteroidEdgesMaterial = new THREE.LineBasicMaterial( { color: 0xFFFFFF, linewidth: 3 } );
+
+		spawnNewAsteroids();
+
+		loaded = true;
+
+	});
 
 		// initPostprocessing();
 	// camera.position.set(15,15,15);
@@ -111,31 +129,74 @@ initScene = function() {
 };
 
 update = function(delta) {
-	if(ship) {
-			if (ship.position.x > halfWall) ship.position.x = - halfWall + 1;
-			if (ship.position.x < -halfWall) ship.position.x = halfWall - 1;
-			if (ship.position.y > halfWall) ship.position.y = - halfWall + 1;
-			if (ship.position.y < -halfWall) ship.position.y = halfWall - 1;
-			if (ship.position.z > halfWall) ship.position.z = - halfWall + 1;
-			if (ship.position.z < -halfWall) ship.position.z = halfWall - 1;
-	}
+	if(loaded) {
+		if(ship) {
+				if (ship.position.x > halfWall) ship.position.x = - halfWall + 1;
+				if (ship.position.x < -halfWall) ship.position.x = halfWall - 1;
+				if (ship.position.y > halfWall) ship.position.y = - halfWall + 1;
+				if (ship.position.y < -halfWall) ship.position.y = halfWall - 1;
+				if (ship.position.z > halfWall) ship.position.z = - halfWall + 1;
+				if (ship.position.z < -halfWall) ship.position.z = halfWall - 1;
+		}
 
-	var amountOfBullets = bullets.length;
-	if (amountOfBullets > 0) {
-		for(var i = amountOfBullets - 1; i >= 0; i--) {
-			if (bullets[i].distance > bulletDiscanceMax) {
-				scene.remove(bullets[i]);
-				bullets.splice(i, 1);
-			} else {
-				var dist = bulletSpeed * delta;
-				bullets[i].translateZ(-dist);
-				bullets[i].distance += dist;
+		var amountOfBullets = bullets.length;
+		if (amountOfBullets > 0) {
+			for(var i = amountOfBullets - 1; i >= 0; i--) {
+				if (bullets[i].distance > bulletDiscanceMax) {
+					scene.remove(bullets[i]);
+					bullets.splice(i, 1);
+				} else {
+					var dist = bulletSpeed * delta;
+					bullets[i].translateZ(-dist);
+					bullets[i].distance += dist;
+				}
 			}
 		}
+
+		var amountOfAsteroids = asteroids.length;
+		if (amountOfAsteroids > 0) {
+			for(var i = amountOfAsteroids - 1; i >= 0; i--) {
+				// update
+				var dist = asteroids[i].speed * delta;
+				asteroids[i].translateZ(dist);
+				if (asteroids[i].position.x > halfWall) asteroids[i].position.x = - halfWall + 1;
+				if (asteroids[i].position.x < -halfWall) asteroids[i].position.x = halfWall - 1;
+				if (asteroids[i].position.y > halfWall) asteroids[i].position.y = - halfWall + 1;
+				if (asteroids[i].position.y < -halfWall) asteroids[i].position.y = halfWall - 1;
+				if (asteroids[i].position.z > halfWall) asteroids[i].position.z = - halfWall + 1;
+				if (asteroids[i].position.z < -halfWall) asteroids[i].position.z = halfWall - 1;
+				if (asteroids[i].spped < asteroidMaxSpeed) asteroids[i].speed += asteroidAcceleration * delta;
+
+				// collisions
+				var amountOfBullets = bullets.length;
+				var killed = false;
+				if (amountOfBullets > 0) {
+					for(var j = amountOfBullets - 1; j >= 0; j--) {
+						if (radiusCollision(asteroids[i], bullets[j])) {
+								addScore(asteroids[i].size);
+								killed = true;
+								scene.remove(bullets[j]);
+								bullets.splice(j, 1);
+								spawnSmashedAsteroids(asteroids[i]);
+						}
+					}
+				}
+				if (!killed) {
+					if (radiusCollision(asteroids[i], ship)) {
+						killed = true;
+					}
+				}
+				if (killed) {
+					scene.remove(asteroids[i]);
+					asteroids.splice(i, 1);
+				}
+			}
+		}
+
+		if(asteroids.length <= 0) spawnNewAsteroids();
+
+		if(controls) controls.update( delta );
 	}
-
-	if(controls) controls.update( delta );
-
 };
 
 render = function() {
@@ -156,12 +217,87 @@ shot = function() {
 	bullet.position.copy(ship.position);
 	bullet.translateZ(-10);
 	bullet.distance = 0;
+	bullet.radius = 0.5;
 	bullets.push(bullet)
 	scene.add(bullet);
-
 }
 
+spawnNewAsteroids = function() {
+	for (var i = 0; i < asteroidsAmount; i++) {
+		var asteroid = createAsteroid(1);
+		asteroids.push(asteroid)
+		scene.add(asteroid);
+	}
+	asteroidsAmount++;
+}
 
+spawnSmashedAsteroids = function(oldAsteroid) {
+	if(oldAsteroid.size === 1 || oldAsteroid.size === 2) {
+		for (var i = 0; i < asteroidChildAmount; i++) {
+			var asteroid = createAsteroid(oldAsteroid.size + 1, oldAsteroid.position);
+			asteroids.push(asteroid)
+			scene.add(asteroid);
+		}
+	}
+}
+
+createAsteroid = function(size, position) {
+	var radius;
+	switch (size) {
+		case 1:	radius = 20; break;
+		case 2:	radius = 10; break;
+		default: radius = 4; break;
+	}
+	var asteroidGeometry = new THREE.IcosahedronGeometry(radius, 0);
+	var asteroidEdgesGeometry = new THREE.EdgesGeometry( asteroidGeometry );
+
+	var asteroid = new THREE.Mesh( asteroidGeometry, asteroidMaterial );
+	var asteroidEdges = new THREE.LineSegments( asteroidEdgesGeometry, asteroidEdgesMaterial );
+	asteroid.add(asteroidEdges);
+
+	if (position) {
+		asteroid.position.copy(position);
+	} else {
+		asteroid.position.copy(asteroidPosition());
+	}
+	asteroid.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI, "XYZ");
+	asteroid.speed = (Math.random() * (asteroidStartSpeedMax - asteroidStartSpeedMin)) + asteroidStartSpeedMin;
+	asteroid.size = size;
+	asteroid.radius = radius;
+
+	return asteroid;
+}
+
+asteroidPosition = function() {
+	var x, y, z;
+	if (ship) {
+		var length = wallLength - 2*asteroidShipBuffor - 2*asteroidWallBuffor;
+		x = Math.random() * length + asteroidShipBuffor + asteroidWallBuffor - halfWall;
+		x = x < ship.position.x ? x - asteroidShipBuffor : x + asteroidShipBuffor;
+		y = Math.random() * length + asteroidShipBuffor + asteroidWallBuffor - halfWall;
+		y = y < ship.position.y ? y - asteroidShipBuffor : y + asteroidShipBuffor;
+		z = Math.random() * length + asteroidShipBuffor + asteroidWallBuffor - halfWall;
+		z = z < ship.position.z ? z - asteroidShipBuffor : z + asteroidShipBuffor;
+	} else {
+		var length = wallLength - 2*asteroidWallBuffor;
+		x = Math.random() * length + asteroidWallBuffor - halfWall;
+		y = Math.random() * length + asteroidWallBuffor - halfWall;
+		z = Math.random() * length + asteroidWallBuffor - halfWall;
+	}
+	return new THREE.Vector3(x,y,z);
+}
+
+radiusCollision = function(object1, object2) {
+	return (Math.sqrt(Math.pow(object1.position.x - object2.position.x, 2) + Math.pow(object1.position.y - object2.position.y, 2) + Math.pow(object1.position.z - object2.position.z, 2)) < (object1.radius + object2.radius));
+}
+
+addScore = function(size) {
+	switch (size) {
+		case 1: score += 20; break;
+		case 2: score += 50; break;
+		case 3: score += 100; break;
+	}
+}
 
 initPostprocessing = function() {
 	composer = new THREE.EffectComposer( renderer );
@@ -175,14 +311,12 @@ initPostprocessing = function() {
 	effect.uniforms[ 'amount' ].value = 0.0015;
 	effect.renderToScreen = true;
 	composer.addPass( effect );
-
 }
 
 additionalControls = function(event) {
 
 	switch (event.which) {
 		case 32: // space
-			console.log("space pressed");
 			shot();
 			break;
 
