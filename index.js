@@ -1,7 +1,8 @@
 var container, renderer;
 var scene, camera;
 
-// var initScene, render;
+// game specyfic
+var ship;
 
 initScene = function() {
 	container = document.getElementById('threejs-renderer');
@@ -27,13 +28,30 @@ initScene = function() {
 	);
 	scene.add( camera );
 
-	var geometry = new THREE.BoxGeometry( 1, 1, 1 );
-	var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
-	var cube = new THREE.Mesh( geometry, material );
-	scene.add( cube );
+	// ambient light
+	var light = new THREE.AmbientLight( 0x404040, 20 ); // soft white light
+	scene.add( light );
+	console.log(light)
 
-	camera.position.set(5,5,5);
-	camera.lookAt(cube.position);
+	// ship
+	var jsonLoader = new THREE.JSONLoader();
+
+	jsonLoader.load( "models/ship.json", function( shipGeometry, shipMaterials ) {
+		var shipMaterial = new THREE.MultiMaterial( shipMaterials );
+		ship = new THREE.Mesh( shipGeometry, shipMaterial );
+		// edges
+		var edgesGeometry = new THREE.EdgesGeometry( shipGeometry );
+		var edgesMaterial = new THREE.LineBasicMaterial( { color: 0xFFFFFF, linewidth: 3 } );
+		var edges = new THREE.LineSegments( edgesGeometry, edgesMaterial );
+		ship.add( edges );
+
+		ship.position.set(0,0,0);
+		scene.add( ship );
+
+		camera.lookAt(ship.position);
+	});
+
+	camera.position.set(15,15,15);
 
 	requestAnimationFrame( render );
 };
