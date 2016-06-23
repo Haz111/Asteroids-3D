@@ -1,7 +1,7 @@
 var container;
 var renderer, composer;
 var scene, camera, controls;
-var render_stats, htmlScore;
+var render_stats, htmlScore, htmlDead;
 
 // game specyfic
 var ship;
@@ -11,6 +11,7 @@ var asteroids = [];
 var asteroidMaterial, asteroidEdgesMaterial;
 
 var loaded = false;
+var dead = false;
 
 var score = 0;
 
@@ -64,6 +65,16 @@ initScene = function() {
 	htmlScore.style.top = 20 + 'px';
 	htmlScore.style.left = 20 + 'px';
 	container.appendChild(htmlScore);
+
+	htmlDead = document.createElement('dead');
+	htmlDead.style.position = 'absolute';
+	htmlDead.style.color = "#624CAB";
+	htmlDead.style.fontSize = "90px";
+	htmlDead.style.fontFamily = '"Lucida Console", Monaco, monospace';
+	htmlDead.innerHTML = "";
+	htmlDead.style.top =  300 + 'px';
+	htmlDead.style.left = 400 + 'px';
+	container.appendChild(htmlDead);
 
 	scene = new THREE.Scene();
 
@@ -130,6 +141,7 @@ initScene = function() {
 		spawnNewAsteroids();
 
 		loaded = true;
+		dead = false;
 
 		initPostprocessing();
 	});
@@ -154,7 +166,7 @@ initScene = function() {
 };
 
 update = function(delta) {
-	if(loaded) {
+	if(loaded && !dead) {
 		if(ship) {
 				if (ship.position.x > halfWall) ship.position.x = - halfWall + 1;
 				if (ship.position.x < -halfWall) ship.position.x = halfWall - 1;
@@ -208,7 +220,8 @@ update = function(delta) {
 				}
 				if (!killed) {
 					if (radiusCollision(asteroids[i], ship)) {
-						killed = true;
+						dead = true;
+						htmlDead.innerHTML = "YOU ARE DEAD! Press F5 to play again!"
 					}
 				}
 				if (killed) {
@@ -222,8 +235,8 @@ update = function(delta) {
 
 		if(controls) controls.update( delta );
 
-		composer.render( delta );
 	}
+	if (loaded) composer.render( delta );
 };
 
 render = function() {
