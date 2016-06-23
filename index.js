@@ -340,7 +340,7 @@ initPostprocessing = function() {
 	composer = new THREE.EffectComposer( renderer );
 	composer.addPass( renderPass );
 	composer.addPass( shaderPass );
-	// composer.addPass( effectFilm );
+	composer.addPass( effectFilm );
 
 }
 
